@@ -37,7 +37,7 @@ public class JiraWebhookHandler {
         } catch (JSONException e) {
             throw new WebhookException('Invalid JSON in request body');
         } catch (Exception e) {
-            System.debug(LoggingLevel.ERROR, 'Error processing webhook: ' + e.getMessage());
+            Logger.error('Error processing webhook: ' + e.getMessage(), e).addTag('JIRA');
             throw new WebhookException(e.getMessage());
         }
     }

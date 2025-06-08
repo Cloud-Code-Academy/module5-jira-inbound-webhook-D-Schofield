@@ -15,25 +15,52 @@ public class JiraProjectProcessor implements IWebhookProcessor {
      * @return Boolean True if the request is valid
      */
     public Boolean validate(RestRequest request) {
+        validateRequestNotNull(request);
+        parseAndValidateWrapper(request);
+        return true;
+    }
+    
+    /**
+     * @description Validates that the request and request body are not null
+     * @param request The REST request to validate
+     */
+    private void validateRequestNotNull(RestRequest request) {
         if (request == null || request.requestBody == null) {
             throw new ProjectWebhookException('Invalid request: Request or request body is null');
         }
-        
+    }
+    
+    /**
+     * @description Parses the request body into a wrapper and validates its contents
+     * @param request The REST request to parse and validate
+     */
+    private void parseAndValidateWrapper(RestRequest request) {
         try {
             String requestBody = request.requestBody.toString();
             this.wrapper = JiraProjectWrapper.parse(requestBody);
             
-            if (wrapper.webhookEvent == null || !wrapper.webhookEvent.startsWith('project_')) {
-                throw new ProjectWebhookException('Invalid webhook event type: ' + wrapper.webhookEvent);
-            }
-            
-            if (wrapper.project == null || wrapper.project.key == null) {
-                throw new ProjectWebhookException('Invalid project data: Missing project or project key');
-            }
-            
-            return true;
+            validateWebhookEvent();
+            validateProjectData();
         } catch (JSONException e) {
             throw new ProjectWebhookException('Invalid JSON in request body: ' + e.getMessage());
+        }
+    }
+    
+    /**
+     * @description Validates the webhook event type
+     */
+    private void validateWebhookEvent() {
+        if (wrapper.webhookEvent == null || !wrapper.webhookEvent.startsWith('project_')) {
+            throw new ProjectWebhookException('Invalid webhook event type: ' + wrapper.webhookEvent);
+        }
+    }
+    
+    /**
+     * @description Validates the project data
+     */
+    private void validateProjectData() {
+        if (wrapper.project == null || wrapper.project.key == null) {
+            throw new ProjectWebhookException('Invalid project data: Missing project or project key');
         }
     }
     
@@ -62,7 +89,7 @@ public class JiraProjectProcessor implements IWebhookProcessor {
                 }
             }
         } catch (Exception e) {
-            System.debug(LoggingLevel.ERROR, 'Error processing project webhook: ' + e.getMessage());
+            Logger.error('Error processing project webhook: ' + e.getMessage(), e).addTag('JIRA');
             throw new ProjectWebhookException('Failed to process project webhook: ' + e.getMessage());
         }
     }

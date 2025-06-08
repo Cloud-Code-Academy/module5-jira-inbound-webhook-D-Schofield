@@ -15,35 +15,62 @@ public class JiraIssueProcessor implements IWebhookProcessor {
      * @return Boolean True if the request is valid
      */
     public Boolean validate(RestRequest request) {
+        validateRequestNotNull(request);
+        parseAndValidateWrapper(request);
+        return true;
+    }
+    
+    /**
+     * @description Validates that the request and request body are not null
+     * @param request The REST request to validate
+     */
+    private void validateRequestNotNull(RestRequest request) {
         if (request == null || request.requestBody == null) {
             throw new IssueWebhookException('Invalid request: Request or request body is null');
         }
-        
+    }
+    
+    /**
+     * @description Parses the request body into a wrapper and validates its contents
+     * @param request The REST request to parse and validate
+     */
+    private void parseAndValidateWrapper(RestRequest request) {
         try {
             String requestBody = request.requestBody.toString();
             this.wrapper = JiraIssueWrapper.parse(requestBody);
             
-            if (wrapper.webhookEvent == null || !wrapper.webhookEvent.startsWith('jira:issue_')) {
-                throw new IssueWebhookException('Invalid webhook event type: ' + wrapper.webhookEvent);
-            }
-            
-            if (wrapper.issue == null || wrapper.issue.key == null) {
-                throw new IssueWebhookException('Invalid issue data: Missing issue or issue key');
-            }
-            
-            // For delete events, we only need the issue key
-            if (wrapper.webhookEvent == 'jira:issue_deleted') {
-                return true;
-            }
-            
-            // For create/update events, we need the fields
-            if (wrapper.issue.fields == null) {
-                throw new IssueWebhookException('Invalid issue data: Missing fields');
-            }
-            
-            return true;
+            validateWebhookEvent();
+            validateIssueData();
         } catch (JSONException e) {
             throw new IssueWebhookException('Invalid JSON in request body: ' + e.getMessage());
+        }
+    }
+    
+    /**
+     * @description Validates the webhook event type
+     */
+    private void validateWebhookEvent() {
+        if (wrapper.webhookEvent == null || !wrapper.webhookEvent.startsWith('jira:issue_')) {
+            throw new IssueWebhookException('Invalid webhook event type: ' + wrapper.webhookEvent);
+        }
+    }
+    
+    /**
+     * @description Validates the issue data based on the event type
+     */
+    private void validateIssueData() {
+        if (wrapper.issue == null || wrapper.issue.key == null) {
+            throw new IssueWebhookException('Invalid issue data: Missing issue or issue key');
+        }
+        
+        // For delete events, we only need the issue key
+        if (wrapper.webhookEvent == 'jira:issue_deleted') {
+            return;
+        }
+        
+        // For create/update events, we need the fields
+        if (wrapper.issue.fields == null) {
+            throw new IssueWebhookException('Invalid issue data: Missing fields');
         }
     }
     
@@ -72,7 +99,7 @@ public class JiraIssueProcessor implements IWebhookProcessor {
                 }
             }
         } catch (Exception e) {
-            System.debug(LoggingLevel.ERROR, 'Error processing issue webhook: ' + e.getMessage());
+            Logger.error('Error processing issue webhook: ' + e.getMessage(), e).addTag('JIRA');
             throw new IssueWebhookException('Failed to process issue webhook: ' + e.getMessage());
         }
     }
