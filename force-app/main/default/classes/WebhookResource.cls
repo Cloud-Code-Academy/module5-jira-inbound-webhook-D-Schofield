@@ -1,43 +1,90 @@
 /**
  * @description REST resource to handle incoming webhooks from various systems
  * Current implementation supports Jira webhooks at /webhook/jira
- * 
- * STUDENT TASK:
- * Complete the doPost method implementation to process incoming webhooks
- * 
- * IMPORTANT NOTE: without sharing is used to avoid sharing issues with the Jira_Issue__c and Jira_Project__c objects but it is not a good practice
- * 
- * @author Student Name
  */
 @RestResource(urlMapping='/webhook/*')
-global without sharing class WebhookResource {
+global class WebhookResource {
     
     /**
-     * @description Handles POST requests from webhooks
-     * @return Returns a simple success response
-     * 
-     * STUDENT TASK:
-     * Implement this method to:
-     * 1. Get the REST request and response objects
-     * 2. Extract the webhook type from the URL path using getWebhookTypeFromPath
-     * 3. Process the webhook using WebhookFactory.processWebhook
-     * 4. Return an appropriate ResponseWrapper
-     * 5. Add error handling using try-catch
+     * @description Handles POST requests to the webhook endpoint
      */
     @HttpPost
-    global static ResponseWrapper doPost() {
-        // TODO: Implement webhook processing logic
-        return new ResponseWrapper('error', 'Method not implemented');
+    global static void doPost() {
+        RestRequest request = RestContext.request;
+        RestResponse response = RestContext.response;
+        
+        try {
+            // Get the webhook type from the URI
+            String webhookType = getWebhookTypeFromPath(request.requestURI);
+            
+            // Process the webhook based on its type
+            if (webhookType == 'jira') {
+                SObject result = JiraWebhookHandler.processRequest(request);
+                
+                // For delete operations, we expect null result
+                if (result == null) {
+                    response.statusCode = 200;
+                    Map<String, String> responseMap = new Map<String, String>{
+                        'message' => 'Record successfully deleted'
+                    };
+                    response.responseBody = Blob.valueOf(JSON.serialize(responseMap));
+                    return;
+                }
+                
+                // For create/update operations, return the processed record
+                response.statusCode = 200;
+                response.responseBody = Blob.valueOf(JSON.serialize(result));
+                return;
+            } else {
+                response.statusCode = 400;
+                Map<String, String> responseMap = new Map<String, String>{
+                    'error' => 'Unsupported webhook type: ' + webhookType
+                };
+                response.responseBody = Blob.valueOf(JSON.serialize(responseMap));
+                return;
+            }
+            
+        } catch (JiraWebhookHandler.WebhookException e) {
+            // For validation errors, return 400
+            response.statusCode = 400;
+            Map<String, String> responseMap = new Map<String, String>{
+                'error' => e.getMessage()
+            };
+            response.responseBody = Blob.valueOf(JSON.serialize(responseMap));
+            return;
+        } catch (JiraIssueProcessor.IssueWebhookException e) {
+            // For validation errors, return 400
+            response.statusCode = 400;
+            Map<String, String> responseMap = new Map<String, String>{
+                'error' => e.getMessage()
+            };
+            response.responseBody = Blob.valueOf(JSON.serialize(responseMap));
+            return;
+        } catch (JiraProjectProcessor.ProjectWebhookException e) {
+            // For validation errors, return 400
+            response.statusCode = 400;
+            Map<String, String> responseMap = new Map<String, String>{
+                'error' => e.getMessage()
+            };
+            response.responseBody = Blob.valueOf(JSON.serialize(responseMap));
+            return;
+        } catch (Exception e) {
+            // For unexpected errors, return 500
+            response.statusCode = 500;
+            Map<String, String> responseMap = new Map<String, String>{
+                'error' => e.getMessage()
+            };
+            response.responseBody = Blob.valueOf(JSON.serialize(responseMap));
+            return;
+        }
     }
     
     /**
      * @description Extracts the webhook type from the URL path
      * @param path The request URI
-     * @return The webhook type (e.g., "jira")
+     * @return String The webhook type (e.g., "jira")
      */
     private static String getWebhookTypeFromPath(String path) {
-        System.debug('getWebhookTypeFromPath: ' + path);
-        // Expected formats: /webhook/jira or /services/apexrest/webhook/jira
         if (path == null) {
             return '';
         }
@@ -48,12 +95,10 @@ global without sharing class WebhookResource {
         if (webhookIndex >= 0) {
             // Extract the part after /webhook/
             String remaining = path.substring(webhookIndex + 9);
-            System.debug('remaining: ' + remaining);
             
             // If there are additional slashes, only take the first segment
             Integer nextSlash = remaining.indexOf('/');
             if (nextSlash > 0) {
-                System.debug('nextSlash: ' + nextSlash);
                 return remaining.substring(0, nextSlash).toLowerCase();
             }
             
@@ -61,18 +106,5 @@ global without sharing class WebhookResource {
         }
         
         return '';
-    }
-    
-    /**
-     * @description Response wrapper class for consistent response format
-     */
-    global class ResponseWrapper {
-        public String status;
-        public String message;
-        
-        public ResponseWrapper(String status, String message) {
-            this.status = status;
-            this.message = message;
-        }
     }
 } 

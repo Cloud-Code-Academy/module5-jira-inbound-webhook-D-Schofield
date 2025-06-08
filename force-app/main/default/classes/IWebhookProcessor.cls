@@ -1,7 +1,6 @@
 /**
  * @description Interface for webhook processors
  * All webhook processors should implement this interface
- * @author Your Name
  */
 public interface IWebhookProcessor {
     
@@ -15,6 +14,7 @@ public interface IWebhookProcessor {
     /**
      * @description Processes the webhook request
      * @param request The REST request containing the webhook payload
+     * @return Object The result of processing (can be null, SObject, or any other type)
      */
-    void process(RestRequest request);
+    Object process(RestRequest request);
 } 
