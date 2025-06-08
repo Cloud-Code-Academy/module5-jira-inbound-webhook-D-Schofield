@@ -44,11 +44,11 @@ private class WebhookResourceTest {
         
         // Call the REST resource
         Test.startTest();
-        WebhookResource.ResponseWrapper response = WebhookResource.doPost();
+        WebhookResource.doPost();
         Test.stopTest();
         
         // Assert the response
-        Assert.areEqual('success', response.status, 'Response status should be success');
+        Assert.areEqual(200, RestContext.response.statusCode, 'Response status code should be 200');
         
         // Verify that the Jira issue record was created
         List<Jira_Issue__c> issues = [
@@ -118,11 +118,11 @@ private class WebhookResourceTest {
         
         // Call the REST resource
         Test.startTest();
-        WebhookResource.ResponseWrapper response = WebhookResource.doPost();
+        WebhookResource.doPost();
         Test.stopTest();
         
         // Assert the response
-        Assert.areEqual('success', response.status, 'Response status should be success');
+        Assert.areEqual(200, RestContext.response.statusCode, 'Response status code should be 200');
         
         // Verify that the Jira issue record was updated
         List<Jira_Issue__c> issues = [
@@ -178,11 +178,13 @@ private class WebhookResourceTest {
         
         // Call the REST resource
         Test.startTest();
-        WebhookResource.ResponseWrapper response = WebhookResource.doPost();
+        WebhookResource.doPost();
         Test.stopTest();
         
         // Assert the response
-        Assert.areEqual('success', response.status, 'Response status should be success');
+        Assert.areEqual(200, RestContext.response.statusCode, 'Response status code should be 200');
+        Map<String, Object> responseBody = (Map<String, Object>)JSON.deserializeUntyped(RestContext.response.responseBody.toString());
+        Assert.areEqual('Record successfully deleted', responseBody.get('message'), 'Response message should indicate successful deletion');
         
         // Verify that the Jira issue record was deleted
         List<Jira_Issue__c> issues = [
@@ -223,11 +225,11 @@ private class WebhookResourceTest {
         
         // Call the REST resource
         Test.startTest();
-        WebhookResource.ResponseWrapper response = WebhookResource.doPost();
+        WebhookResource.doPost();
         Test.stopTest();
         
         // Assert the response
-        Assert.areEqual('success', response.status, 'Response status should be success');
+        Assert.areEqual(200, RestContext.response.statusCode, 'Response status code should be 200');
         
         // Verify that the Jira project record was created
         List<Jira_Project__c> projects = [
@@ -252,7 +254,7 @@ private class WebhookResourceTest {
         RestRequest req = new RestRequest();
         req.requestURI = '/webhook/invalid';
         req.httpMethod = 'POST';
-        req.requestBody = Blob.valueOf('{"test": "data"}');
+        req.requestBody = Blob.valueOf('{}');
         
         // Set the request and response
         RestContext.request = req;
@@ -260,24 +262,24 @@ private class WebhookResourceTest {
         
         // Call the REST resource
         Test.startTest();
-        WebhookResource.ResponseWrapper response = WebhookResource.doPost();
+        WebhookResource.doPost();
         Test.stopTest();
         
         // Assert the response
-        Assert.areEqual('error', response.status, 'Response status should be error');
-        Assert.isTrue(response.message.contains('Unsupported webhook type'), 'Error message should indicate unsupported webhook type');
+        Assert.areEqual(400, RestContext.response.statusCode, 'Response status code should be 400');
+        Assert.isTrue(RestContext.response.responseBody.toString().contains('Unsupported webhook type'), 'Response should indicate invalid webhook type');
     }
     
     /**
-     * @description Test method for invalid JSON payload
+     * @description Test method for invalid request body
      */
     @IsTest
-    static void testInvalidJsonPayload() {
-        // Create test request with invalid JSON
+    static void testInvalidRequestBody() {
+        // Create test request
         RestRequest req = new RestRequest();
         req.requestURI = '/webhook/jira';
         req.httpMethod = 'POST';
-        req.requestBody = Blob.valueOf('{"invalid JSON');
+        req.requestBody = Blob.valueOf('invalid json');
         
         // Set the request and response
         RestContext.request = req;
@@ -285,10 +287,15 @@ private class WebhookResourceTest {
         
         // Call the REST resource
         Test.startTest();
-        WebhookResource.ResponseWrapper response = WebhookResource.doPost();
+        WebhookResource.doPost();
         Test.stopTest();
         
+        // Debug the response
+        System.debug('Response Status Code: ' + RestContext.response.statusCode);
+        System.debug('Response Body: ' + RestContext.response.responseBody.toString());
+        
         // Assert the response
-        Assert.areEqual('error', response.status, 'Response status should be error');
+        Assert.areEqual(400, RestContext.response.statusCode, 'Response status code should be 400');
+        Assert.isTrue(RestContext.response.responseBody.toString().contains('Invalid JSON in request body'), 'Response should indicate invalid JSON');
     }
 } 
